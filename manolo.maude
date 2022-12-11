@@ -1,0 +1,409 @@
+load time.maude
+load model-checker.maude
+
+---AUTORES
+---MANUEL NIETO JIMÉNEZ
+
+
+fmod ID is 
+    pr STRING .
+    ---Identificadores
+    sort Id .
+    op id : String -> Id [ctor] .
+endfm
+
+view Id from TRIV to ID is
+    sort Elt to Id .
+endv
+
+fmod NODE is 
+    pr STRING .
+    pr POSRAT-TIME-DOMAIN-WITH-INF .
+    pr SET{Id} .
+
+    ---Nodos, flujos y puertas
+    sort Gateway .
+    op exclusive : -> Gateway [ctor] .
+    op parallel : -> Gateway [ctor] .
+
+    sort Node .
+    ---nodo inicial
+    op start : Id Id -> Node [ctor] .
+    ---nodo final
+    op end : Id Id -> Node [ctor] .
+    ---tarea
+    op task : Id String Id Id Time Set{Id} -> Node [ctor] .
+    ---split
+    op split : Id Gateway Id Set{Id} -> Node [ctor] .
+    ---merge
+    op merge : Id Gateway Set{Id} Id -> Node [ctor] .
+endfm
+
+view Node from TRIV to NODE is
+    sort Elt to Node .
+endv
+
+fmod RESOURCE is
+    pr ID .
+
+    ---Recursos
+    sort Resource .
+    op resource : Id Nat Nat -> Resource [ctor] .
+endfm
+
+view Resource from TRIV to RESOURCE is
+    sort Elt to Resource .
+endv
+
+fmod FLOW is 
+    pr ID .
+    pr POSRAT-TIME-DOMAIN-WITH-INF .
+
+    ---Flujos
+    sort Flow .
+    op flow : Id Time -> Flow [ctor] .
+endfm
+
+view Flow from TRIV to FLOW is
+    sort Elt to Flow .
+endv
+
+fmod TOKEN is
+    pr ID .
+    pr POSRAT-TIME-DOMAIN-WITH-INF .
+
+    ---Tokens
+    sort Token .
+    op token : Id Time -> Token [ctor] .
+endfm
+
+view Token from TRIV to TOKEN is
+    sort Elt to Token .
+endv
+
+mod BPMN-SEM is
+    inc CONFIGURATION .
+    pr SET{Node} .
+    pr SET{Resource} .
+    pr SET{Flow} .
+    pr SET{Token} .
+    pr POSRAT-TIME-DOMAIN-WITH-INF .
+    pr BOOL .
+
+    ---Clase Process
+    sort Process .
+    subsort Process < Cid Configuration .
+    subsort Nat < Oid .
+
+    ---class Process | nodes: Set{Node}, flows: Set{Flow}, tokens: Set{Token}, gtime: Time, resources: Set{Resource} .
+
+    op Process : -> Process .
+    op nodes:_ : Set{Node} -> Attribute [ctor gather (&)] .
+    op flows:_ : Set{Flow} -> Attribute [ctor gather (&)] .
+    op tokens:_ : Set{Token} -> Attribute [ctor gather (&)] .
+    op gtime:_ : Time -> Attribute [ctor gather (&)] .
+    op resources:_ : Set{Resource} -> Attribute [ctor gather (&)] .
+
+    ---Variables
+    var P : Process .
+    vars T : Token .
+    vars I1 I2 I3 I4 : Id .
+    vars T1 T2 GT TN : Time .
+    var N1 : Node .
+    var S : String .
+    var G1 : Gateway .
+    var N : Oid .
+    var R1 : Resource .
+    var M1 M2 : Nat .
+
+    var SI1 SI2 : Set{Id} .
+    var SN : Set{Node} .
+    var SF : Set{Flow} .
+    var ST : Set{Token} .
+    var SR : Set{Resource} .
+
+    ---Operaciones auxiliares
+    ---Calcula un nuevo token con los valores del nodo siguiente a partir de la id del flow en el que estamos (suponemos que siempre existe)
+    op nodoSiguiente : Id Set{Node} -> Token .
+
+    eq nodoSiguiente(I1,(end(I2,I1),SN)) = token(I2,0) .
+    ceq nodoSiguiente(I1,(end(I2,I3),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
+
+    eq nodoSiguiente(I1,(task(I2,S,I1,I4,T1,SI1),SN)) = token(I2,T1) .
+    ceq nodoSiguiente(I1,(task(I2,S,I3,I4,T1,SI1),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
+
+    eq nodoSiguiente(I1,(split(I2,G1,I1,SI1),SN)) = token(I2,0) .
+    ceq nodoSiguiente(I1,(split(I2,G1,I3,SI1),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
+
+    eq nodoSiguiente(I1,(merge(I2,G1,(I1,SI1),I4),SN)) = token(I2,0) .
+    ceq nodoSiguiente(I1,(merge(I2,G1,(I3,SI1),I4),SN)) = nodoSiguiente(I1,(merge(I2,G1,SI1,I4),SN)) if I1 =/= I3 .
+    eq nodoSiguiente(I1,(merge(I2,G1,empty,I4),SN)) = nodoSiguiente(I1,SN) .
+
+    ---Calcula un nuevo token con los valores del flow siguiente a partir de su id. Esta operacion busca su tiempo.
+    op flowSiguiente : Id Set{Flow} -> Token .
+    eq flowSiguiente(I1,(flow(I1,T1),SF)) = token(I1,T1) .
+    ceq flowSiguiente(I1,(flow(I2,T1),SF)) = flowSiguiente(I1,SF) if I1 =/= I2 .
+
+    ---Esta operación ordena el conjunto (aunque no se mantendrá luego en la ejecución el orden, solo en las auxiliares)
+    op ordenar : Set{Token} -> Set{Token} .
+    eq ordenar(empty) = empty .
+    eq ordenar((T,ST)) = insert-elem(ordenar(ST),T) .
+
+    op insert-elem : Set{Token} Token -> Set{Token} .
+    eq insert-elem(empty,T) = T,empty .
+    ceq insert-elem((token(I1,T1),ST),token(I2,T2)) = token(I2,T2),token(I1,T1),ST if T1 >= T2 . 
+    ceq insert-elem((token(I1,T1),ST),token(I2,T2)) = token(I1,T1),(insert-elem(ST,token(I2,T2))) if T1 >= T2 = false . 
+
+    --- Esta operación comprueba si existen recursos suficientes para que se ejecute una tarea
+    op disponible : Id Set{Resource} -> Bool .
+    eq disponible(I1,empty) = false .
+    ceq disponible(I1,(resource(I2,M1,M2),SR)) = true if (I1 == I2) and (M2 > 0) .
+    ceq disponible(I1,(resource(I2,M1,M2),SR)) = false if (I1 == I2) and (M2 == 0) .
+    ceq disponible(I1,(resource(I2,M1,M2),SR)) = disponible(I1,SR) if (I1 =/= I2) .
+
+    op tieneRecursos : Set{Id} Set{Resource} -> Bool .
+    eq tieneRecursos(empty, empty) = true .
+    eq tieneRecursos(SI1,empty) = false .
+    eq tieneRecursos(empty,SR) = true .
+    ceq tieneRecursos((I1,SI1),SR) = tieneRecursos(SI1,SR) if disponible(I1,SR) .
+    ceq tieneRecursos((I1,SI1),SR) = false if not disponible(I1,SR) .
+
+    --- Esta función comprueba si se puede ejecutar un token
+    op esNodoYPuedeEjecutarse : Id Set{Node} Set{Resource} -> Bool .
+    eq esNodoYPuedeEjecutarse(I1,empty,SR) = false .
+
+    ceq esNodoYPuedeEjecutarse(I1,(start(I2,I3),SN),SR) = true if I1 = I2 .
+    ceq esNodoYPuedeEjecutarse(I1,(start(I2,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
+
+    ceq esNodoYPuedeEjecutarse(I1,(end(I2,I3),SN),SR) = true if I1 = I2 .
+    ceq esNodoYPuedeEjecutarse(I1,(end(I2,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
+
+    ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = true if I1 = I2 .
+    ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
+
+    ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) .
+    ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
+
+    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = true if (I1 == I2) .
+    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
+
+    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = true if (I1 == I2) and (todasEsperando()) .
+    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = false if (I1 == I2) and () .
+    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = esNodoYPuedeEjecutarse(I1,SI2,SR) if (I1 =/= I2) .
+
+    op esFlowYPuedeEjecutarse : Id Set{Flow} -> Bool .
+    eq esFlowYPuedeEjecutarse(I1,empty) = false .
+    ceq esFlowYPuedeEjecutarse(I1,(flow(I2,T2),SF)) = true if I1 = I2 .
+    eq esFlowYPuedeEjecutarse(I1,(flow(I2,T2),SF)) = esFlowYPuedeEjecutarse(I1,SF) [owise] .
+
+    op puedeEjecutarse : Token Set{Node} Set{Flow} Set{Resource} -> Bool .
+    eq puedeEjecutarse(token(I1,T1),SN,SF,SR) = esNodoYPuedeEjecutarse(I1,SN,SR) or esFlowYPuedeEjecutarse(I1,SF) .
+
+    ---Esta operación busca el primer token que se pueda ejecutar
+    op buscarToken : Set{Token} Set{Node} Set{Flow} Set{Resource} -> Time .
+    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = T1 if puedeEjecutarse(token(I1,T1),SN,SF,SR) .
+    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = buscarToken(ST,SN,SF,SR) if puedeEjecutarse(token(I1,T1),SN,SF,SR) = false .
+    eq buscarToken(ST,SN,SF,SR) = 0 [owise] .
+
+    op mte : Process -> Time .
+    eq mte(< N : Process | nodes: SN, flows: SF, tokens: ST, gtime: T1, resources: SR >) = buscarToken(ordenar(ST),SN,SF,SR) .
+
+    op delta : Set{Token} Time -> Set{Token} .
+    eq delta(empty, TN) = empty .
+    ceq delta((token(I1,T1),ST),TN) = (token(I1,T1 - TN),delta(ST,TN)) if (T1 - TN >= 0) .
+    eq delta((token(I1,T1),ST),TN) = (token(I1,0),delta(ST,TN)) [owise] .
+    ---Reglas
+
+    ---Incrementa el tiempo
+    crl [tick] : < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > => 
+                    < N : Process | nodes: SN, flows: SF, tokens: (delta(ST,TN)), gtime: (GT + TN), resources: SR > 
+                    if TN := mte( < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > ) /\ (TN =/= 0) /\ (ST =/= empty) /\ (GT <= 100) .
+
+    ---Inicia pasando de start al primer flow
+    rl [start] : < N : Process | nodes: (start(I1,I2),SN), flows: (flow(I2,T2),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
+                    < N : Process | nodes: (start(I1,I2),SN), flows: (flow(I2,T2),SF), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
+
+    ---Finaliza una tarea eliminando el token
+    rl [end] : < N : Process | nodes: (end(I1,I2),SN), flows: SF, tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
+                    < N : Process | nodes: (end(I1,I2),SN), flows: SF, tokens: ST, gtime: GT, resources: SR > .
+
+    ---Pasa de un flow a un nodo (el tiempo es 0)
+    rl [flowToSplit] : < N : Process | nodes: (split(I1,G1,I2,SI1),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,0),ST), gtime: GT, resources: SR > => 
+                        < N : Process | nodes: (split(I1,G1,I2,SI1),SN), flows: (flow(I2,T1),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > .
+
+    ---Hemos hecho que el flow pase al merge con GT como tiempo para evitar que se creen dos token iguales y se eliminen (estamos en un Conjunto y no puede haber elementos repetidos)
+    rl [flowToMerge] : < N : Process | nodes: (merge(I1,G1,(I2,SI1),I3),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,0),ST), gtime: GT, resources: SR > => 
+                        < N : Process | nodes:  (merge(I1,G1,(I2,SI1),I3),SN), flows: (flow(I2,T1),SF), tokens: (token(I1,GT),ST), gtime: GT, resources: SR > .
+                        
+    rl [flowToEnd] : < N : Process | nodes: (end(I1,I2),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,0),ST), gtime: GT, resources: SR > => 
+                        < N : Process | nodes: (end(I1,I2),SN), flows: (flow(I2,T1),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > .
+
+    crl [flowToTask] : < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: (flow(I2,T2),SF), tokens: (token(I2,0),ST), gtime: GT, resources: SR > => 
+                        < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: (flow(I2,T2),SF), tokens: (token(I1,T1),ST), gtime: GT, resources: (quitarRecursos(SI1,SR)) > 
+                        if tieneRecursos(SI1,SR) .
+
+    ---esta función devuelve los recursos usados por una tarea
+    op devolverRecursosIndividual : Id Set{Resource} -> Set{Resource} .
+    eq devolverRecursosIndividual(I1,empty) = empty .
+    eq devolverRecursosIndividual(I1,(resource(I1,M1,M2),SR)) = (resource(I1,M1,(M2 + 1)),SR) .
+    ceq devolverRecursosIndividual(I1,(resource(I2,M1,M2),SR)) = (resource(I1,M1,M2),devolverRecursosIndividual(I1,SR)) if I1 =/= I2 .
+
+    op devolverRecursos : Set{Id} Set{Resource} -> Set{Resource} .
+    eq devolverRecursos(empty, SR) = SR .
+    eq devolverRecursos((I1,SI1),SR) = devolverRecursos(SI1,devolverRecursosIndividual(I1,SR)) .
+
+    ---Pasa de un nodo a un flow (el tiempo es 0)
+    rl [taskToFlow] : < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: SF, tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
+                        < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: SF, tokens: (flowSiguiente(I3,SF),ST), gtime: GT, resources: devolverRecursos(SI1,SR) > .
+
+    op parallelMakeTokens : Set{Token} Set{Flow} Set{Id} -> Set{Token} .
+    eq parallelMakeTokens((ST), (SF), (empty)) = ST .
+    eq parallelMakeTokens((ST), (empty), (SI1)) = ST .
+    eq parallelMakeTokens((ST), (flow(I1, T1),SF), (I1,SI1)) = token(I1,T1),parallelMakeTokens(ST, SF, SI1) .
+
+    ---red parallelMakeTokens(token(id("00"), 0), ((flow(id("01"),2),flow(id("02"),2),flow(id("03"),2),flow(id("04"),2))),(id("01"),id("03"),id("04"))) .
+
+    rl [splitExclusive] : < N : Process | nodes: (split(I1,exclusive,I2,(I3,SI1)),SN), flows: SF,flow(I3, T2), tokens: (token(I1, 0),ST), gtime: GT, resources: SR > => 
+                            < N : Process | nodes: (split(I1,exclusive,I2,(I3,SI1)),SN), flows: SF,flow(I3, T2), tokens: (token(I3, T2),ST), gtime: GT, resources: SR > .
+
+    rl [splitParallel] : < N : Process | nodes: (split(I1,parallel,I2,(SI1)),SN), flows: SF, tokens: (token(I1,T1),ST), gtime: GT, resources: SR > => 
+                            < N : Process | nodes: (split(I1,parallel,I2,(SI1)),SN), flows: SF, tokens: parallelMakeTokens(ST,SF,SI1), gtime: GT, resources: SR > .
+
+    ---la tratamos como si fuera un start o end. Si ha llegado un token aqui, entonces simplemente pasamos al siguiente flow, ya que no hay que esperar a ningun token
+    rl [mergeExclusive] : < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I1,T1),ST), gtime: GT, resources: SR > =>
+                            < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
+
+    ---comprobamos si todas las ramas han llegado al merge
+    op estanTodos : Id Set{Token} Set{Id} -> Bool .
+    eq estanTodos(I1,empty,empty) = true .
+    eq estanTodos(I1,ST, empty) = true .
+    eq estanTodos(I1,empty,SI1) = false .
+    eq estanTodos(I1,(token(I1,T1),ST),(I2,SI1)) = estanTodos(I1,ST,SI1) .
+    ceq estanTodos(I1,(token(I2,T1),ST),(I3,SI1)) = estanTodos(I1,ST,(I3,SI1)) if I1 =/= I2 .
+
+    ---Esta operación elimina las instancias de token que se encuentran en el merge
+    op juntarAux : Id Set{Token} -> Set{Token} .
+    eq juntarAux(I1,empty) = empty .
+    eq juntarAux(I1,(token(I1,T1),ST)) = juntarAux(I1,ST) .
+    ceq juntarAux(I1,(token(I2,T1),ST)) = (token(I2,T1),juntarAux(I1,ST)) if I1 =/= I2 .
+
+    ---el token tiene tiempo 0 porque el merge no gasta tiempo
+    op juntar : Id Set{Token} -> Set{Token} .
+    eq juntar(I1,ST) = juntarAux(I1,ST) .
+    ---eq juntar(I1,ST) = empty [owise] .
+
+    crl [mergeParellel] : < N : Process | nodes: (merge(I1,parallel,SI1,I2),SN), flows: (flow(I2,T1),SF), tokens: ST, gtime: GT, resources: SR > =>
+                            < N : Process | nodes: (merge(I1,parallel,SI1,I2),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,T1),juntar(I1,ST)), gtime: GT, resources: SR >
+                            if estanTodos(I1,ST,SI1) .
+
+    ---Esta operación reserva recursos para una task
+    op auxRecursosIndividual : Id Set{Resource} -> Set{Resource} .
+    eq auxRecursosIndividual(I1,empty) = empty .
+    eq auxRecursosIndividual(I1,(resource(I1,M1,M2),SR)) = (resource(I1,M1,M2 - 1),SR) .
+
+    op quitarRecursos : Set{Id} Set{Resource} -> Set{Resource} .
+    eq quitarRecursos(empty, SR) = SR .
+    eq quitarRecursos((I1,SI1),SR) = quitarRecursos(SI1,auxRecursosIndividual(I1,SR)) .
+
+    ---Cosas para probar
+    op o : -> Oid .
+    op PROCESS1 : -> Object .
+    eq PROCESS1 
+        = < o : Process | 
+            nodes: (start(id("00"), id("01")),
+                    task(id("02"), "Sign in", id("01"), id("03"), 2, empty),
+                    split(id("04"), parallel, id("03"), (id("07"),id("05"))), 
+                    task(id("06"), "Log out", id("05"), id("07"), 3, empty),
+                    end(id("09"), id("05")),
+                    end(id("08"), id("07"))),
+            flows: (flow(id("01"), 2),
+                    flow(id("03"), 2),
+                    flow(id("05"), 3),
+                    flow(id("07"), 4)),
+            gtime: 0,
+            tokens: token(id("02"), 2),
+            resources: empty > .
+
+    op setDeFlow : -> Set{Flow} .
+    eq setDeFlow = (flow(id("01"),2),flow(id("02"),2)) .
+
+
+    op PROCESS15 : -> Object .
+    eq PROCESS15 
+        = < o : Process | 
+            nodes: (start(id("00"), id("01")),
+                    merge(id("02"), exclusive, (id("01"), id("03")), id("03")),
+                    end(id("04"), id("03"))), 
+            flows: (flow(id("01"), 2), 
+                    flow(id("03"), 2)),
+            gtime: 0,
+            tokens: (token(id("02"), 0),token(id("02"), 2)),
+            resources: empty > .
+
+
+    op o : -> Oid .
+  op PROCESS-2 : -> Object .
+  eq PROCESS-2 
+    = < o : Process | 
+        nodes: (start(id("00"), id("01")),
+                task(id("02"), "Sign in", id("01"), id("03"), 2, empty),
+                task(id("06"), "Search products", id("05"), id("07"), 2, empty),
+                merge(id("04"), exclusive, (id("03"), id("09")), id("05")),
+                split(id("08"), exclusive, id("07"), (id("09"), id("10"))),
+                end(id("11"), id("10"))), 
+        flows: (flow(id("01"), 2),
+                flow(id("03"), 2),
+                flow(id("05"), 2),
+                flow(id("07"), 2),
+                flow(id("09"), 2),
+                flow(id("10"), 2)),
+        gtime: 0,
+        tokens: token(id("00"), 0),
+        resources: empty > .
+
+endm
+
+
+
+mod BPMN-SEM-PREDS is
+    pr BPMN-SEM .
+    inc SATISFACTION .
+    subsort Configuration < State .
+
+    op proc-mode : Nat Set{Token} -> Prop .
+
+    var N : Oid .
+    var SN : Set{Node} .
+    var SF : Set{Flow} .
+    var ST : Set{Token} .
+    var GT : Time .
+    var SR : Set{Resource} .
+
+    eq < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > |= proc-mode(N, ST) = true .
+
+endm
+
+mod BPMN-SEM-CHECK is
+    pr BPMN-SEM-PREDS .
+    inc MODEL-CHECKER .
+    inc LTL-SIMPLIFIER .
+endm
+
+eof
+
+search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > .
+search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that ST:Set{Token} =/= empty .
+search [20] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100 .
+
+search [1] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: (T:Token,ST:Set{Token}), gtime: 32, resources: SR:Set{Resource} > .
+
+--- ejercicio 3
+--- siempre ocurre que desde un estado cualquiera pasaremos a un estado terminal en algún
+--- momento
+red modelCheck(PROCESS, ([] proc-mode(N:Oid, ST:Set{Token}) -> (<> proc-mode(N:Oid, empty)))) .
+
+--- ejercicio 4
+--- siempre ocurre que se estamos en la tarea 14 vamos a pasar a la tarea 21 o 22.
+red modelCheck(PROCESS, ([] (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n21"),T1:Time),(ST1:Set{Token}))))) \/ (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n22"),T2:Time),(ST2:Set{Token})))))) .
+
+red modelCheck(PROCESS, ([] ((proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n21"),T1:Time),(ST1:Set{Token}))))) \/ (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n22"),T2:Time),(ST2:Set{Token})))))))) .

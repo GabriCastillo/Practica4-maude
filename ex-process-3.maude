@@ -1,5 +1,5 @@
 mod BPMN-EX is
-  pr BPMN-SEM . ---- module with the semantics of BPMN
+  pr BPMN-SEM-CHECK . ---- module with the semantics of BPMN
 
   op o : -> Oid .
   op PROCESS : -> Object .
