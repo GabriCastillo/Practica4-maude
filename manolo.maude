@@ -305,105 +305,13 @@ mod BPMN-SEM is
     eq quitarRecursos(empty, SR) = SR .
     eq quitarRecursos((I1,SI1),SR) = quitarRecursos(SI1,auxRecursosIndividual(I1,SR)) .
 
-    ---Cosas para probar
-    op o : -> Oid .
-    op PROCESS1 : -> Object .
-    eq PROCESS1 
-        = < o : Process | 
-            nodes: (start(id("00"), id("01")),
-                    task(id("02"), "Sign in", id("01"), id("03"), 2, empty),
-                    split(id("04"), parallel, id("03"), (id("07"),id("05"))), 
-                    task(id("06"), "Log out", id("05"), id("07"), 3, empty),
-                    end(id("09"), id("05")),
-                    end(id("08"), id("07"))),
-            flows: (flow(id("01"), 2),
-                    flow(id("03"), 2),
-                    flow(id("05"), 3),
-                    flow(id("07"), 4)),
-            gtime: 0,
-            tokens: token(id("02"), 2),
-            resources: empty > .
-
-    op setDeFlow : -> Set{Flow} .
-    eq setDeFlow = (flow(id("01"),2),flow(id("02"),2)) .
-
-
-    op PROCESS15 : -> Object .
-    eq PROCESS15 
-        = < o : Process | 
-            nodes: (start(id("00"), id("01")),
-                    merge(id("02"), exclusive, (id("01"), id("03")), id("03")),
-                    end(id("04"), id("03"))), 
-            flows: (flow(id("01"), 2), 
-                    flow(id("03"), 2)),
-            gtime: 0,
-            tokens: (token(id("02"), 0),token(id("02"), 2)),
-            resources: empty > .
-
-
-    op o : -> Oid .
-  op PROCESS-2 : -> Object .
-  eq PROCESS-2 
-    = < o : Process | 
-        nodes: (start(id("00"), id("01")),
-                task(id("02"), "Sign in", id("01"), id("03"), 2, empty),
-                task(id("06"), "Search products", id("05"), id("07"), 2, empty),
-                merge(id("04"), exclusive, (id("03"), id("09")), id("05")),
-                split(id("08"), exclusive, id("07"), (id("09"), id("10"))),
-                end(id("11"), id("10"))), 
-        flows: (flow(id("01"), 2),
-                flow(id("03"), 2),
-                flow(id("05"), 2),
-                flow(id("07"), 2),
-                flow(id("09"), 2),
-                flow(id("10"), 2)),
-        gtime: 0,
-        tokens: token(id("00"), 0),
-        resources: empty > .
-
 endm
 
-
-
-mod BPMN-SEM-PREDS is
-    pr BPMN-SEM .
-    inc SATISFACTION .
-    subsort Configuration < State .
-
-    op proc-mode : Nat Set{Token} -> Prop .
-
-    var N : Oid .
-    var SN : Set{Node} .
-    var SF : Set{Flow} .
-    var ST : Set{Token} .
-    var GT : Time .
-    var SR : Set{Resource} .
-
-    eq < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > |= proc-mode(N, ST) = true .
-
-endm
-
-mod BPMN-SEM-CHECK is
-    pr BPMN-SEM-PREDS .
-    inc MODEL-CHECKER .
-    inc LTL-SIMPLIFIER .
-endm
 
 eof
 
-search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > .
-search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that ST:Set{Token} =/= empty .
-search [20] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100 .
+search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100  .
+search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that ST:Set{Token} == empty .
+search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100 .
 
 search [1] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: (T:Token,ST:Set{Token}), gtime: 32, resources: SR:Set{Resource} > .
-
---- ejercicio 3
---- siempre ocurre que desde un estado cualquiera pasaremos a un estado terminal en algún
---- momento
-red modelCheck(PROCESS, ([] proc-mode(N:Oid, ST:Set{Token}) -> (<> proc-mode(N:Oid, empty)))) .
-
---- ejercicio 4
---- siempre ocurre que se estamos en la tarea 14 vamos a pasar a la tarea 21 o 22.
-red modelCheck(PROCESS, ([] (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n21"),T1:Time),(ST1:Set{Token}))))) \/ (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n22"),T2:Time),(ST2:Set{Token})))))) .
-
-red modelCheck(PROCESS, ([] ((proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n21"),T1:Time),(ST1:Set{Token}))))) \/ (proc-mode(N:Oid, (token(id("n14"),T:Time),(ST:Set{Token}))) -> (<> proc-mode(N:Oid, (token(id("n22"),T2:Time),(ST2:Set{Token})))))))) .
