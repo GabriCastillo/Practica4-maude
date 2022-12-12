@@ -210,7 +210,7 @@ mod BPMN-SEM is
 
     op delta : Set{Token} Time -> Set{Token} .
     eq delta(empty, TN) = empty .
-    ceq delta((token(I1,T1),ST),TN) = (token(I1,T1 - TN),delta(ST,TN)) if (T1 - TN >= 0) .
+    ceq delta((token(I1,T1),ST),TN) = (token(I1,sd(T1, TN)),delta(ST,TN)) if (T1 > TN) .
     eq delta((token(I1,T1),ST),TN) = (token(I1,0),delta(ST,TN)) [owise] .
     ---Reglas
 
@@ -310,8 +310,6 @@ endm
 
 eof
 
-search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} >  .
-search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that ST:Set{Token} =/= empty .
-search [20] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100 .
+search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time <= 100  .
+search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time < 100 .
 
-search [1] PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: (T:Token,ST:Set{Token}), gtime: 32, resources: SR:Set{Resource} > .
