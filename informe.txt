@@ -5,8 +5,11 @@ Explica el resultado.
     Utilizamos el comando:
     search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > . 
 
-    Para comprobar los estados del proceso donde el atributo de tokens este vacio.
-    Salen un total de 37 soluciones, debido a que es el numero de iteraciones donde un token alcanza un nodo final.
+    Para comprobar los estados del proceso donde el atributo de tokens este vacio. La limitacion de las unidades de tiempo se realizo en la regla tick (linea 201), haciendo
+    que esta regla se ejecute mientras la actualizacion del tiempo sea menor o igual a 100 unidades.
+    
+    Maunde nos proporciona un total de 36 soluciones, sinedo estas todas aquellas donde el token alcanza un nodo final como lo son n05 o n08, ya que, la unica forma de no tener
+    ningun token, es que la ejecucion del programa haya acabado. 
 
 Utiliza el comando search para verificar si hay situaciones de bloqueo para ejecuciones del
 proceso antes del transcurso de 100 unidades de tiempo. Explica el resultado.

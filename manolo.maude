@@ -181,15 +181,14 @@ mod BPMN-SEM is
     ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = true if I1 = I2 .
     ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
 
-    ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) .
+    ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) and tieneRecursos(SI1,SR)  .
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
 
     ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = true if (I1 == I2) .
     ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
 
-    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = true if (I1 == I2) and (todasEsperando()) .
-    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = false if (I1 == I2) and () .
-    ---ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,SI1,I3),SI2),SR) = esNodoYPuedeEjecutarse(I1,SI2,SR) if (I1 =/= I2) .
+    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,(SI1),I3),SN),SR) = true if (I1 == I2) .
+    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,(SI1),I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
 
     op esFlowYPuedeEjecutarse : Id Set{Flow} -> Bool .
     eq esFlowYPuedeEjecutarse(I1,empty) = false .
