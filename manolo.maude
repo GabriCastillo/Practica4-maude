@@ -168,11 +168,17 @@ mod BPMN-SEM is
     ceq tieneRecursos((I1,SI1),SR) = tieneRecursos(SI1,SR) if disponible(I1,SR) .
     ceq tieneRecursos((I1,SI1),SR) = false if not disponible(I1,SR) .
 
+    ---comprobamos si todas las ramas han llegado al merge
+    op estanTodos : Id Set{Token} Set{Id} -> Bool .
+    eq estanTodos(I1,empty,empty) = true .
+    eq estanTodos(I1,ST, empty) = true .
+    eq estanTodos(I1,empty,SI1) = false .
+    eq estanTodos(I1,(token(I1,T1),ST),(I2,SI1)) = estanTodos(I1,ST,SI1) .
+    ceq estanTodos(I1,(token(I2,T1),ST),(I3,SI1)) = estanTodos(I1,ST,(I3,SI1)) if I1 =/= I2 .
+
     --- Esta función comprueba si se puede ejecutar un token
     op esNodoYPuedeEjecutarse : Id Set{Node} Set{Resource} -> Bool .
     eq esNodoYPuedeEjecutarse(I1,empty,SR) = false .
-
-    
 
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) and tieneRecursos(SI1,SR)  .
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
@@ -188,13 +194,17 @@ mod BPMN-SEM is
     ceq esFlowYPuedeEjecutarse(I1,(flow(I2,T2),SF)) = true if I1 = I2 .
     eq esFlowYPuedeEjecutarse(I1,(flow(I2,T2),SF)) = esFlowYPuedeEjecutarse(I1,SF) [owise] .
 
-    op puedeEjecutarse : Token Set{Node} Set{Flow} Set{Resource} -> Bool .
-    eq puedeEjecutarse(token(I1,T1),SN,SF,SR) = esNodoYPuedeEjecutarse(I1,SN,SR) or esFlowYPuedeEjecutarse(I1,SF) .
+    op esMergeParallelYPuedeEjecutarse : Id Set{Token} Set{Node} -> Bool .
+    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I2,parallel,(SI1),I3),SN)) = true if I1 == I2 and estanTodos(I2,ST,SI1) .
+    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I2,parallel,(SI1),I3),SN)) = esMergeParallelYPuedeEjecutarse(I1,ST,SN) if (I1 =/= I2) .
+
+    op puedeEjecutarse : Set{Token} Token Set{Node} Set{Flow} Set{Resource} -> Bool .
+    eq puedeEjecutarse(ST,token(I1,T1),SN,SF,SR) = esNodoYPuedeEjecutarse(I1,SN,SR) or esFlowYPuedeEjecutarse(I1,SF) or esMergeParallelYPuedeEjecutarse(I1,ST,SN) .
 
     ---Esta operación busca el primer token que se pueda ejecutar
     op buscarToken : Set{Token} Set{Node} Set{Flow} Set{Resource} -> Time .
-    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = T1 if puedeEjecutarse(token(I1,T1),SN,SF,SR) .
-    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = buscarToken(ST,SN,SF,SR) if puedeEjecutarse(token(I1,T1),SN,SF,SR) = false .
+    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = T1 if puedeEjecutarse((token(I1,T1),ST),token(I1,T1),SN,SF,SR) .
+    ceq buscarToken((token(I1,T1),ST),SN,SF,SR) = buscarToken(ST,SN,SF,SR) if puedeEjecutarse((token(I1,T1),ST),token(I1,T1),SN,SF,SR) = false .
     eq buscarToken(ST,SN,SF,SR) = 0 [owise] .
 
     op mte : Process -> Time .
@@ -265,13 +275,7 @@ mod BPMN-SEM is
     rl [mergeExclusive] : < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I1,T1),ST), gtime: GT, resources: SR > =>
                             < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
 
-    ---comprobamos si todas las ramas han llegado al merge
-    op estanTodos : Id Set{Token} Set{Id} -> Bool .
-    eq estanTodos(I1,empty,empty) = true .
-    eq estanTodos(I1,ST, empty) = true .
-    eq estanTodos(I1,empty,SI1) = false .
-    eq estanTodos(I1,(token(I1,T1),ST),(I2,SI1)) = estanTodos(I1,ST,SI1) .
-    ceq estanTodos(I1,(token(I2,T1),ST),(I3,SI1)) = estanTodos(I1,ST,(I3,SI1)) if I1 =/= I2 .
+    
 
     ---Esta operación elimina las instancias de token que se encuentran en el merge
     op juntarAux : Id Set{Token} -> Set{Token} .
