@@ -172,14 +172,7 @@ mod BPMN-SEM is
     op esNodoYPuedeEjecutarse : Id Set{Node} Set{Resource} -> Bool .
     eq esNodoYPuedeEjecutarse(I1,empty,SR) = false .
 
-    ceq esNodoYPuedeEjecutarse(I1,(start(I2,I3),SN),SR) = true if I1 = I2 .
-    ceq esNodoYPuedeEjecutarse(I1,(start(I2,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
-
-    ceq esNodoYPuedeEjecutarse(I1,(end(I2,I3),SN),SR) = true if I1 = I2 .
-    ceq esNodoYPuedeEjecutarse(I1,(end(I2,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
-
-    ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = true if I1 = I2 .
-    ceq esNodoYPuedeEjecutarse(I1,(split(I2,G1,I3,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if I1 =/= I2 .
+    
 
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) and tieneRecursos(SI1,SR)  .
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
@@ -310,5 +303,5 @@ endm
 eof
 
 search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > .
-search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time < 100 .
+search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > .
 
