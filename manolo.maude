@@ -217,7 +217,7 @@ mod BPMN-SEM is
     ---Incrementa el tiempo
     crl [tick] : < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > => 
                     < N : Process | nodes: SN, flows: SF, tokens: (delta(ST,TN)), gtime: (GT + TN), resources: SR > 
-                    if TN := mte( < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > ) /\ (TN =/= 0) /\ (ST =/= empty) /\ (GT <= 100) .
+                    if TN := mte( < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > ) /\ (TN =/= 0) /\ (ST =/= empty) /\ (GT + TN <= 100) .
 
     ---Inicia pasando de start al primer flow
     rl [start] : < N : Process | nodes: (start(I1,I2),SN), flows: (flow(I2,T2),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
@@ -310,6 +310,6 @@ endm
 
 eof
 
-search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > .
+search PROCESS =>* < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: empty, gtime: GT:Time, resources: SR:Set{Resource} > .
 search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time < 100 .
 

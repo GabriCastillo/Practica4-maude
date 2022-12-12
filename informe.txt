@@ -11,6 +11,7 @@ Explica el resultado.
 Utiliza el comando search para verificar si hay situaciones de bloqueo para ejecuciones del
 proceso antes del transcurso de 100 unidades de tiempo. Explica el resultado.
 
+    Utilizamos el comando:
     search PROCESS =>! < N:Oid : Process | nodes: SN:Set{Node}, flows: SF:Set{Flow}, tokens: ST:Set{Token}, gtime: GT:Time, resources: SR:Set{Resource} > such that GT:Time < 100 .
     Salen un total de 36 soluciones, debido a que es el numero de iteraciones donde un token alcanza un nodo final y como esta limitado pues salen menos soluciones
     que el anterior (aunque creo que deberian de salir mas porque si llega a un task sin recursos..).
