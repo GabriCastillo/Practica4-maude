@@ -2,7 +2,6 @@ load time.maude
 
 fmod ID is 
     pr STRING .
-    ---Identificadores
     sort Id .
     op id : String -> Id [ctor] .
 endfm
@@ -16,21 +15,15 @@ fmod NODE is
     pr POSRAT-TIME-DOMAIN-WITH-INF .
     pr SET{Id} .
 
-    ---Nodos, flujos y puertas
     sort Gateway .
     op exclusive : -> Gateway [ctor] .
     op parallel : -> Gateway [ctor] .
 
     sort Node .
-    ---nodo inicial
     op start : Id Id -> Node [ctor] .
-    ---nodo final
     op end : Id Id -> Node [ctor] .
-    ---tarea
     op task : Id String Id Id Time Set{Id} -> Node [ctor] .
-    ---split
     op split : Id Gateway Id Set{Id} -> Node [ctor] .
-    ---merge
     op merge : Id Gateway Set{Id} Id -> Node [ctor] .
 endfm
 
@@ -41,7 +34,6 @@ endv
 fmod RESOURCE is
     pr ID .
 
-    ---Recursos
     sort Resource .
     op resource : Id Nat Nat -> Resource [ctor] .
 endfm
@@ -54,7 +46,6 @@ fmod FLOW is
     pr ID .
     pr POSRAT-TIME-DOMAIN-WITH-INF .
 
-    ---Flujos
     sort Flow .
     op flow : Id Time -> Flow [ctor] .
 endfm
@@ -67,7 +58,6 @@ fmod TOKEN is
     pr ID .
     pr POSRAT-TIME-DOMAIN-WITH-INF .
 
-    ---Tokens
     sort Token .
     op token : Id Time -> Token [ctor] .
 endfm
@@ -85,7 +75,6 @@ mod BPMN-SEM is
     pr POSRAT-TIME-DOMAIN-WITH-INF .
     pr BOOL .
 
-    ---Clase Process
     sort Process .
     subsort Process < Cid Configuration .
     subsort Nat < Oid .
@@ -99,7 +88,6 @@ mod BPMN-SEM is
     op gtime:_ : Time -> Attribute [ctor gather (&)] .
     op resources:_ : Set{Resource} -> Attribute [ctor gather (&)] .
 
-    ---Variables
     var P : Process .
     vars T : Token .
     vars I1 I2 I3 I4 : Id .
@@ -157,7 +145,7 @@ mod BPMN-SEM is
     eq estanTodos(I1,(token(I1,T1),ST),(I2,SI1)) = estanTodos(I1,ST,SI1) .
     ceq estanTodos(I1,(token(I2,T1),ST),(I3,SI1)) = estanTodos(I1,ST,(I3,SI1)) if I1 =/= I2 .
 
-    --- Esta función comprueba si se puede ejecutar un token
+    --- Esta operación comprueba si se puede ejecutar un token
     op esNodoYPuedeEjecutarse : Id Set{Node} Set{Resource} -> Bool .
     eq esNodoYPuedeEjecutarse(I1,empty,SR) = false .
 
@@ -193,22 +181,19 @@ mod BPMN-SEM is
     eq delta(empty, TN) = empty .
     ceq delta((token(I1,T1),ST),TN) = (token(I1,sd(T1, TN)),delta(ST,TN)) if (T1 > TN) .
     eq delta((token(I1,T1),ST),TN) = (token(I1,0),delta(ST,TN)) [owise] .
+
     ---Reglas
 
-    ---Incrementa el tiempo
     crl [tick] : < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > => 
                     < N : Process | nodes: SN, flows: SF, tokens: (delta(ST,TN)), gtime: (GT + TN), resources: SR > 
                     if TN := mte( < N : Process | nodes: SN, flows: SF, tokens: ST, gtime: GT, resources: SR > ) /\ (TN =/= 0) /\ (ST =/= empty) /\ (GT + TN <= 100) .
 
-    ---Inicia pasando de start al primer flow
     rl [start] : < N : Process | nodes: (start(I1,I2),SN), flows: (flow(I2,T2),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
                     < N : Process | nodes: (start(I1,I2),SN), flows: (flow(I2,T2),SF), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
 
-    ---Finaliza una tarea eliminando el token
     rl [end] : < N : Process | nodes: (end(I1,I2),SN), flows: SF, tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
                     < N : Process | nodes: (end(I1,I2),SN), flows: SF, tokens: ST, gtime: GT, resources: SR > .
 
-    ---Pasa de un flow a un nodo (el tiempo es 0)
     rl [flowToSplit] : < N : Process | nodes: (split(I1,G1,I2,SI1),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,0),ST), gtime: GT, resources: SR > => 
                         < N : Process | nodes: (split(I1,G1,I2,SI1),SN), flows: (flow(I2,T1),SF), tokens: (token(I1,0),ST), gtime: GT, resources: SR > .
 
@@ -233,41 +218,31 @@ mod BPMN-SEM is
     eq devolverRecursos(empty, SR) = SR .
     eq devolverRecursos((I1,SI1),SR) = devolverRecursos(SI1,devolverRecursosIndividual(I1,SR)) .
 
-    ---Pasa de un nodo a un flow (el tiempo es 0)
+    ---Pasa de un nodo a un flow 
     rl [taskToFlow] : < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: SF, tokens: (token(I1,0),ST), gtime: GT, resources: SR > => 
                         < N : Process | nodes: (task(I1,S,I2,I3,T1,SI1),SN), flows: SF, tokens: (flowSiguiente(I3,SF),ST), gtime: GT, resources: devolverRecursos(SI1,SR) > .
 
-    op parallelMakeTokens : Set{Token} Set{Flow} Set{Id} -> Set{Token} .
-    eq parallelMakeTokens((ST), (SF), (empty)) = ST .
-    eq parallelMakeTokens((ST), (empty), (SI1)) = ST .
-    eq parallelMakeTokens((ST), (flow(I1, T1),SF), (I1,SI1)) = token(I1,T1),parallelMakeTokens(ST, SF, SI1) .
-
-    ---red parallelMakeTokens(token(id("00"), 0), ((flow(id("01"),2),flow(id("02"),2),flow(id("03"),2),flow(id("04"),2))),(id("01"),id("03"),id("04"))) .
+    op parallelCreaTokens : Set{Token} Set{Flow} Set{Id} -> Set{Token} .
+    eq parallelCreaTokens((ST), (SF), (empty)) = ST .
+    eq parallelCreaTokens((ST), (empty), (SI1)) = ST .
+    eq parallelCreaTokens((ST), (flow(I1, T1),SF), (I1,SI1)) = token(I1,T1),parallelCreaTokens(ST, SF, SI1) .
 
     rl [splitExclusive] : < N : Process | nodes: (split(I1,exclusive,I2,(I3,SI1)),SN), flows: SF,flow(I3, T2), tokens: (token(I1, 0),ST), gtime: GT, resources: SR > => 
                             < N : Process | nodes: (split(I1,exclusive,I2,(I3,SI1)),SN), flows: SF,flow(I3, T2), tokens: (token(I3, T2),ST), gtime: GT, resources: SR > .
 
     rl [splitParallel] : < N : Process | nodes: (split(I1,parallel,I2,(SI1)),SN), flows: SF, tokens: (token(I1,T1),ST), gtime: GT, resources: SR > => 
-                            < N : Process | nodes: (split(I1,parallel,I2,(SI1)),SN), flows: SF, tokens: parallelMakeTokens(ST,SF,SI1), gtime: GT, resources: SR > .
+                            < N : Process | nodes: (split(I1,parallel,I2,(SI1)),SN), flows: SF, tokens: parallelCreaTokens(ST,SF,SI1), gtime: GT, resources: SR > .
 
     ---la tratamos como si fuera un start o end. Si ha llegado un token aqui, entonces simplemente pasamos al siguiente flow, ya que no hay que esperar a ningun token
     rl [mergeExclusive] : < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I1,T1),ST), gtime: GT, resources: SR > =>
                             < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
 
-    ---esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = true if (I1 == I2) .
-    ---esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
-
 
     ---Esta operación elimina las instancias de token que se encuentran en el merge
-    op juntarAux : Id Set{Token} -> Set{Token} .
-    eq juntarAux(I1,empty) = empty .
-    eq juntarAux(I1,(token(I1,T1),ST)) = juntarAux(I1,ST) .
-    ceq juntarAux(I1,(token(I2,T1),ST)) = (token(I2,T1),juntarAux(I1,ST)) if I1 =/= I2 .
-
-    ---el token tiene tiempo 0 porque el merge no gasta tiempo
     op juntar : Id Set{Token} -> Set{Token} .
-    eq juntar(I1,ST) = juntarAux(I1,ST) .
-    ---eq juntar(I1,ST) = empty [owise] .
+    eq juntar(I1,empty) = empty .
+    eq juntar(I1,(token(I1,T1),ST)) = juntar(I1,ST) .
+    ceq juntar(I1,(token(I2,T1),ST)) = (token(I2,T1),juntar(I1,ST)) if I1 =/= I2 .
 
     crl [mergeParellel] : < N : Process | nodes: (merge(I1,parallel,SI1,I2),SN), flows: (flow(I2,T1),SF), tokens: ST, gtime: GT, resources: SR > =>
                             < N : Process | nodes: (merge(I1,parallel,SI1,I2),SN), flows: (flow(I2,T1),SF), tokens: (token(I2,T1),juntar(I1,ST)), gtime: GT, resources: SR >
