@@ -116,23 +116,9 @@ mod BPMN-SEM is
     var SF : Set{Flow} .
     var ST : Set{Token} .
     var SR : Set{Resource} .
+    var N' : Node .
 
     ---Operaciones auxiliares
-    ---Calcula un nuevo token con los valores del nodo siguiente a partir de la id del flow en el que estamos (suponemos que siempre existe)
-    op nodoSiguiente : Id Set{Node} -> Token .
-
-    eq nodoSiguiente(I1,(end(I2,I1),SN)) = token(I2,0) .
-    ceq nodoSiguiente(I1,(end(I2,I3),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
-
-    eq nodoSiguiente(I1,(task(I2,S,I1,I4,T1,SI1),SN)) = token(I2,T1) .
-    ceq nodoSiguiente(I1,(task(I2,S,I3,I4,T1,SI1),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
-
-    eq nodoSiguiente(I1,(split(I2,G1,I1,SI1),SN)) = token(I2,0) .
-    ceq nodoSiguiente(I1,(split(I2,G1,I3,SI1),SN)) = nodoSiguiente(I1,SN) if I1 =/= I3 .
-
-    eq nodoSiguiente(I1,(merge(I2,G1,(I1,SI1),I4),SN)) = token(I2,0) .
-    ceq nodoSiguiente(I1,(merge(I2,G1,(I3,SI1),I4),SN)) = nodoSiguiente(I1,(merge(I2,G1,SI1,I4),SN)) if I1 =/= I3 .
-    eq nodoSiguiente(I1,(merge(I2,G1,empty,I4),SN)) = nodoSiguiente(I1,SN) .
 
     ---Calcula un nuevo token con los valores del flow siguiente a partir de su id. Esta operacion busca su tiempo.
     op flowSiguiente : Id Set{Flow} -> Token .
@@ -175,14 +161,11 @@ mod BPMN-SEM is
     op esNodoYPuedeEjecutarse : Id Set{Node} Set{Resource} -> Bool .
     eq esNodoYPuedeEjecutarse(I1,empty,SR) = false .
 
-    ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = true if (I1 == I2) and tieneRecursos(SI1,SR)  .
+    ceq esNodoYPuedeEjecutarse(I1,(task(I1,S,I2,I3,T1,SI1),SN),SR) = true if tieneRecursos(SI1,SR)  .
     ceq esNodoYPuedeEjecutarse(I1,(task(I2,S,I3,I4,T1,SI1),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
 
-    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = true if (I1 == I2) .
+    eq esNodoYPuedeEjecutarse(I1,(merge(I1,exclusive,SI1,I2),SN),SR) = true .
     ceq esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
-
-    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,(SI1),I3),SN),SR) = true if (I1 == I2) .
-    ceq esNodoYPuedeEjecutarse(I1,(merge(I2,parallel,(SI1),I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
 
     op esFlowYPuedeEjecutarse : Id Set{Flow} -> Bool .
     eq esFlowYPuedeEjecutarse(I1,empty) = false .
@@ -190,8 +173,9 @@ mod BPMN-SEM is
     eq esFlowYPuedeEjecutarse(I1,(flow(I2,T2),SF)) = esFlowYPuedeEjecutarse(I1,SF) [owise] .
 
     op esMergeParallelYPuedeEjecutarse : Id Set{Token} Set{Node} -> Bool .
-    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I2,parallel,(SI1),I3),SN)) = true if I1 == I2 and estanTodos(I2,ST,SI1) .
-    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I2,parallel,(SI1),I3),SN)) = esMergeParallelYPuedeEjecutarse(I1,ST,SN) if (I1 =/= I2) .
+    eq esMergeParallelYPuedeEjecutarse(I1,ST,empty) = false .
+    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I1,parallel,(SI1),I2),SN)) = true if estanTodos(I1,ST,SI1) .
+    ceq esMergeParallelYPuedeEjecutarse(I1,ST,(merge(I2,parallel,(SI1),I3),SN)) = esMergeParallelYPuedeEjecutarse(I1,ST,SN) if (I1 =/= I2)  .
 
     op puedeEjecutarse : Set{Token} Token Set{Node} Set{Flow} Set{Resource} -> Bool .
     eq puedeEjecutarse(ST,token(I1,T1),SN,SF,SR) = esNodoYPuedeEjecutarse(I1,SN,SR) or esFlowYPuedeEjecutarse(I1,SF) or esMergeParallelYPuedeEjecutarse(I1,ST,SN) .
@@ -270,7 +254,9 @@ mod BPMN-SEM is
     rl [mergeExclusive] : < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I1,T1),ST), gtime: GT, resources: SR > =>
                             < N : Process | nodes: (merge(I1,exclusive,SI1,I2),SN), flows: SF,flow(I3, T2), tokens: (token(I2,T2),ST), gtime: GT, resources: SR > .
 
-    
+    ---esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = true if (I1 == I2) .
+    ---esNodoYPuedeEjecutarse(I1,(merge(I2,exclusive,SI1,I3),SN),SR) = esNodoYPuedeEjecutarse(I1,SN,SR) if (I1 =/= I2) .
+
 
     ---Esta operación elimina las instancias de token que se encuentran en el merge
     op juntarAux : Id Set{Token} -> Set{Token} .
