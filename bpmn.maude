@@ -1,9 +1,4 @@
 load time.maude
-load model-checker.maude
-
----AUTORES
----MANUEL NIETO JIMÉNEZ
-
 
 fmod ID is 
     pr STRING .
